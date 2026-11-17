@@ -5,6 +5,17 @@
   var SITE = location.origin + location.pathname;
   var YAGEUN_URL = 'https://overtimenote.kr';
   // 카카오톡 공유 (카카오 개발자 사이트의 JavaScript 키, 사이트에 공개되는 키)
+  // 방문·이용 통계 (구글 애널리틱스). 측정 ID(G-로 시작)를 넣으면 켜짐. 비워 두면 아무것도 안 보냄
+  var GA_ID = '';
+  (function () {
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    if (!GA_ID || /localhost|127\.0\.0\.1/.test(location.hostname)) return;  // 내 PC에서 시험할 땐 안 셈
+    var sc = document.createElement('script'); sc.async = true; sc.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID; document.head.appendChild(sc);
+    gtag('js', new Date()); gtag('config', GA_ID);
+  })();
+  // 이름·직함 같은 개인정보는 보내지 않고, 버튼을 눌렀다는 사실과 결과 장수 이름만 보냄
+  function track(name, params) { try { if (GA_ID) gtag('event', name, params || {}); } catch (e) {} }
   var KAKAO_JS_KEY = '523d5866bf18feffdf65fdfd3df72bc8';  // '직장삼국지 웹' 키 (JS SDK 도메인 등록된 키)
   try { if (window.Kakao && !Kakao.isInitialized()) Kakao.init(KAKAO_JS_KEY); } catch (e) {}
   // 야근수첩 출시 상태: 스토어 주소가 생기면 여기만 채우면 배너가 휴대폰 종류에 맞게 바뀜
@@ -144,7 +155,7 @@
       '<p class="meta">16문항을 답하고 30가지 장수 중 한 명이 되어 보자</p>' +
       '<button class="img-btn" id="start" aria-label="출정하기"><img src="img/ui/btn-start.webp" alt="" width="960" height="296"></button>' +
       '</section>');
-    document.getElementById('start').onclick = function () { state = newState(); chooseWho(); };
+    document.getElementById('start').onclick = function () { track('test_start'); state = newState(); chooseWho(); };
     fitIntro(); window.onresize = fitIntro;
     // 버튼 이미지·글꼴이 늦게 불러와지면 높이가 바뀌므로 다시 맞춤
     var bi = document.querySelector('#start img'); if (bi && !bi.complete) bi.onload = fitIntro;
@@ -230,6 +241,7 @@
     render('<div class="loading"><div><div class="spin"></div><p>군사가 천하의 형세를 살피는 중…</p></div></div>');
     var top = E.judge(state.answers, D, { tenure: state.tenure, role: state.role });
     saveAnswers(state.answers, top[0].char.name);
+    track('test_complete', { result: top[0].char.name, who: state.who === 'peer' ? '동료' : '나', tenure: D.tenures[state.tenure], role: state.role === 1 ? '팀장' : '팀원' });
     var ctx = { who: state.who, tenure: state.tenure, role: state.role, label: peerLabel(state), title: (state.ptitle || '').trim() };
     loopTimer = setTimeout(function () { result(top, false, ctx); }, 1400);
   }
@@ -275,19 +287,20 @@
       '<button class="btn btn-wood" id="dex">30인 장수 도감</button></div>' +
       yageunHTML(c, isPeer) +
       '<div class="ad">광고 자리 (출시 때 애드센스)</div>' +
-      '<p class="footer">재미로 보는 테스트예요. 결과는 실제 성격 검사가 아닙니다.<br>캐릭터 이미지 © 직장 삼국지</p>' +
+      '<p class="footer">재미로 보는 테스트예요. 결과는 실제 성격 검사가 아닙니다.' + (GA_ID ? ' 방문 통계(구글 애널리틱스)를 수집해요.' : '') + '<br>캐릭터 이미지 © 직장 삼국지</p>' +
       '</section>');
     startActor(c);
     Array.prototype.forEach.call(app.querySelectorAll('.similar button, .partners button'), function (b) {
       b.onclick = function () { detail(byName(b.dataset.n)); };
     });
-    document.getElementById('again').onclick = function () { history.replaceState(null, '', location.pathname); state = newState(); chooseWho(); };
+    document.getElementById('again').onclick = function () { track(shared ? 'shared_try' : 'test_again'); history.replaceState(null, '', location.pathname); state = newState(); chooseWho(); };
     document.getElementById('dex').onclick = dex;
     var sh = document.getElementById('share'); if (sh) sh.onclick = function () { share(c, isPeer, ctx.title); };
     var sh2 = document.getElementById('share2'); if (sh2) sh2.onclick = function () { share(c, isPeer, ctx.title, true); };
     var sv = document.getElementById('save'); if (sv) { sv.onclick = function () { saveImage(c, isPeer, ctx); }; setTimeout(function () { buildImage(c, isPeer, ctx).catch(function () {}); }, 1500); }
   }
 
+  document.addEventListener('click', function (e) { var a = e.target.closest && e.target.closest('a.yageun'); if (a) track('yageun_click'); });
   // 야근수첩 배너 (결과 화면 위·아래 두 곳)
   function yageunHTML(c, isPeer) {
     var L = yageunLink();
@@ -361,6 +374,7 @@
     var t = (title || '').trim(); if (t && !/님$/.test(t)) t += '님';
     var text = isPeer ? '우리 팀 ' + (t || '그 분') + '은 ' + c.name + '(' + c.sub + ')래. 너희 팀엔 어떤 장수가 있어?'
                       : '회사에서 나는 ' + c.name + '(' + c.sub + ')래. 너는 어떤 장수야?';
+    track('share', { method: other ? '링크·기타' : '카카오톡', result: c.name });
     if (other) return otherShare(text, url);
     // 1순위: 카카오톡 공유(장수 카드 + '결과 보기'·'나도 테스트하기' 버튼)
     var img = base + 'img/share/' + SLUG[c.name] + (isPeer ? '-team' : '') + '.jpg';
@@ -466,6 +480,7 @@
     return job;
   }
   function saveImage(c, isPeer, ctx) {
+    track('save_image', { result: c.name });
     var bg = sheet('<h3>결과 이미지</h3><p id="saveMsg">이미지를 만드는 중이에요…</p><div id="saveBox"></div>');
     var msg = bg.querySelector('#saveMsg'), box = bg.querySelector('#saveBox');
     var card = 'img/share/' + SLUG[c.name] + (isPeer ? '-team' : '') + '.jpg';
@@ -629,5 +644,6 @@
   // ---------- 시작점 ----------
   var r = new URLSearchParams(location.search).get('r');
   var shared = r && byName(r);
+  if (shared) track('shared_visit', { result: shared.name });
   if (shared) result([{ char: shared, match: 0 }], true, { who: new URLSearchParams(location.search).get('p') ? 'peer' : 'me' }); else intro();
 })();

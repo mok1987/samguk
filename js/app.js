@@ -267,7 +267,6 @@
       yageunHTML(c, isPeer) +
       '<div class="scroll"><h3>직장에서는 이런 사람</h3><p>' + esc(c.desc) + '</p></div>' +
       adviceHTML(c, isPeer ? who : null) + partnersHTML(c, isPeer ? who : null) +
-      (sim ? '<div class="scroll"><h3>' + (isPeer ? '그 분과 닮은 장수' : '나와 닮은 장수') + '</h3><div class="similar">' + sim + '</div><p class="note">매칭 점수는 앱 안에서 계산한 재미용 점수예요.</p></div>' : '') +
       '<div class="actions">' +
       (shared ? palaceBtn('again', '出 征', '나도 해 보기') :
         palaceBtn('share', '傳 令', '카카오톡으로 공유') +
@@ -302,9 +301,11 @@
   // 조심할 점 + 개선 팁 (동료 모드면 '○○님과 일할 때' 문구)
   function adviceHTML(c, who) {
     return '<div class="scroll advice"><h3>' + (who ? esc(who) + '과 일할 때 알아 둘 점' : '이런 점은 조심해요') + '</h3>' +
-      '<p class="warn"><b>주의</b>' + esc(c.caution) + '</p>' +
-      '<p class="tip"><b>' + (who ? '이렇게 해 보세요' : '이렇게 바꿔 보세요') + '</b>' + esc(who ? c.tipPeer : c.tipSelf) + '</p></div>';
+      '<p>' + esc(c.caution) + '</p>' +
+      '<h3 class="tip-h">' + (who ? '이렇게 해 보세요' : '이렇게 바꿔 보세요') + '</h3>' +
+      '<p>' + esc(who ? c.tipPeer : c.tipSelf) + '</p></div>';
   }
+
   // 같이 일하면 좋은 장수 4명 (tools/engine.py의 상호 보완 로직으로 미리 계산)
   function partnersHTML(c, who) {
     if (!c.partners) return '';
@@ -312,7 +313,7 @@
       c.partners.map(function (p) {
         var pc = byName(p.n);
         return '<button data-n="' + esc(p.n) + '"><img src="' + img(p.n) + '" alt=""><span><b>' + esc(p.n) + '</b><i>' + esc(pc.sub) + '</i><em>' + esc(p.why) + '</em></span></button>';
-      }).join('') + '</div></div>';
+      }).join('') + '</div><p class="partner-note">주변에 이런 동료가 있을지 공유해 봐요</p></div>';
   }
 
   function stageHTML(c) {

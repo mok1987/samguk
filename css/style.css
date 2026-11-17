@@ -271,13 +271,8 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .you b{color:var(--seal);font-weight:800}
 
 /* 조심할 점 */
-.advice p{margin:8px 0 10px}
-.advice p b{display:inline-block;font-size:12.5px;padding:2px 8px;border-radius:3px;margin-bottom:4px;color:#fff4dc}
-.advice p b::after{content:"";display:block}
-.advice .warn b{background:#6b1d14}
-.advice .tip b{background:var(--jade)}
-.advice p{display:block}
-.advice p b{display:table}
+.advice p{margin:0 0 10px}
+.advice h3.tip-h{background:var(--jade);margin-top:4px}
 
 /* 같이 일하면 좋은 장수 */
 .partners{display:grid;gap:8px}
@@ -310,3 +305,4 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .yageun > span{flex:1;min-width:0}
 .yageun b{display:block;font-size:14px;line-height:1.35;word-break:keep-all}
 .yageun .ycta{display:block;font-style:normal;font-size:12px;font-weight:700;color:var(--gold);margin-top:2px}
+.partner-note{text-align:center;font-family:var(--serif);font-weight:700;font-size:14.5px;color:var(--seal);margin-top:10px}

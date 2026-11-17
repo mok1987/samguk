@@ -154,6 +154,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .actions{display:grid;gap:12px;margin:22px 0}
 .yageun{text-decoration:none;display:flex;gap:12px;align-items:center;text-align:left;color:#f2ecdf;border-radius:8px;padding:16px;margin:18px 0;
   background:linear-gradient(#26324a,#1a2338);border:1.5px solid var(--gold2);box-shadow:inset 0 0 0 3px #1a2338,inset 0 0 0 4px rgba(226,187,92,.45)}
+.yageun .yicon{flex:none;width:56px;height:56px;border-radius:13px;box-shadow:0 0 0 2px var(--gold2)}
 .yageun .ico{font-size:30px}.yageun b{display:block;font-size:15px;margin-bottom:3px}.yageun p{font-size:13.5px;line-height:1.5;opacity:.9}
 .ad{border:1.5px dashed var(--line);border-radius:8px;padding:22px;font-size:13px;color:var(--ink2);margin:14px 0}
 .footer{font-size:11.5px;color:var(--ink2);text-align:center;margin-top:22px;line-height:1.6}

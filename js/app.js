@@ -249,6 +249,7 @@
       '<p class="tap-hint">캐릭터를 누르면 다시 말해요</p>' +
       plate(c) +
       '<div class="chips">' + c.traits.map(function (t) { return '<span class="chip">' + esc(t) + '</span>'; }).join('') + '</div>' +
+      yageunHTML(c, isPeer) +
       '<div class="scroll"><h3>직장에서는 이런 사람</h3><p>' + esc(c.desc) + '</p></div>' +
       adviceHTML(c, isPeer ? who : null) + partnersHTML(c, isPeer ? who : null) +
       (sim ? '<div class="scroll"><h3>' + (isPeer ? '그 분과 닮은 장수' : '나와 닮은 장수') + '</h3><div class="similar">' + sim + '</div><p class="note">매칭 점수는 앱 안에서 계산한 재미용 점수예요.</p></div>' : '') +
@@ -257,9 +258,7 @@
         palaceBtn('share', '傳 令', '결과 공유하기') +
         '<div class="row"><button class="btn btn-wood" id="save">이미지 저장</button><button class="btn btn-wood" id="again">' + (isPeer ? '다른 사람 보기' : '다시 하기') + '</button></div>') +
       '<button class="btn btn-wood" id="dex">30인 장수 도감</button></div>' +
-      '<a class="yageun" href="' + YAGEUN_URL + '" target="_blank" rel="noopener"><span class="ico">🌙</span><span><b>' +
-        (isPeer ? esc(c.name) + '형과 일하다 늘어난 야근, 야근수첩' : esc(c.name) + '형 직장인의 야근 관리, 야근수첩') +
-        '</b><p>' + esc(isPeer ? '누구 때문에 늦게 퇴근했는지, 오늘 야근부터 잠금화면 버튼 한 번으로 남겨 두세요.' : (YAGEUN[c.type] || '')) + '</p></span></a>' +
+      yageunHTML(c, isPeer) +
       '<div class="ad">광고 자리 (출시 때 애드센스)</div>' +
       '<p class="footer">재미로 보는 테스트예요. 결과는 실제 성격 검사가 아닙니다.<br>캐릭터 이미지 © 직장 삼국지</p>' +
       '</section>');
@@ -271,6 +270,13 @@
     document.getElementById('dex').onclick = dex;
     var sh = document.getElementById('share'); if (sh) sh.onclick = function () { share(c, isPeer, ctx.title); };
     var sv = document.getElementById('save'); if (sv) sv.onclick = function () { saveImage(c, isPeer); };
+  }
+
+  // 야근수첩 배너 (결과 화면 위·아래 두 곳)
+  function yageunHTML(c, isPeer) {
+    return '<a class="yageun" href="' + YAGEUN_URL + '" target="_blank" rel="noopener"><img class="yicon" src="img/ui/yageun-icon.webp" alt="야근수첩"><span><b>' +
+      (isPeer ? esc(c.name) + '형과 일하다 늘어난 야근, 야근수첩' : esc(c.name) + '형 직장인의 야근 관리, 야근수첩') +
+      '</b><p>' + esc(isPeer ? '누구 때문에 늦게 퇴근했는지, 오늘 야근부터 잠금화면 버튼 한 번으로 남겨 두세요.' : (YAGEUN[c.type] || '')) + '</p></span></a>';
   }
 
   // 조심할 점 + 개선 팁 (동료 모드면 '○○님과 일할 때' 문구)

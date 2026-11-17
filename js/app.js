@@ -502,7 +502,11 @@
     var hHead = 330 + hBubble, hPlate = 330, hChips = chipRows * 84 + 50;
     var hDesc = 130 + descL.length * LH, hAdv = 230 + (p1L.length + p2L.length) * LH;
     var hPart = parts.length ? 130 + whyL.reduce(function (a, w) { return a + Math.max(130, 70 + w.length * 38); }, 0) : 0;
-    var H = hHead + hChar + hPlate + hChips + hDesc + 40 + hAdv + 40 + hPart + 40 + 190;
+    // 휴대폰 화면 비율(1080×2340)에 꽉 차게: '직장에서는 이런 사람'까지만 넣고, 남는 높이는 장수 그림과 여백으로 채움
+    var fixed = 345 + hBubble + 20 + hPlate + hChips + hDesc + 200;
+    var H = 2340, hChar = Math.max(380, Math.min(780, H - fixed));  // 요즘 휴대폰 화면 비율(약 9:19.5)
+    if (fixed + hChar > H) H = fixed + hChar;
+    var gap = (H - fixed - hChar) / 3;
     cv.width = W; cv.height = H;
     // 배경 (사이트와 같은 구름 무늬)
     g.fillStyle = '#efe3c8'; g.fillRect(0, 0, W, H);
@@ -523,7 +527,7 @@
       g.strokeStyle = 'rgba(255,240,210,.6)'; g.lineWidth = 3; round(g, W / 2 - w / 2 + 5, cy + 5, w - 10, h - 10, 4); g.stroke();
       g.fillStyle = '#fff4dc'; g.fillText(t, W / 2, cy + h / 2 + size * 0.36);
     }
-    var y = 105;
+    var y = 105 + gap * 0.6;
     font(900, 52); g.fillStyle = '#8f1d14'; g.fillText('직장 삼국지', W / 2, y);
     y += 40; seal(c.type, y, 34, 26, 64);
     y += 120; font(600, 38); g.fillStyle = '#6b5238';
@@ -536,11 +540,11 @@
     g.save(); g.translate(W / 2, y + bh); g.rotate(Math.PI / 4); g.fillStyle = '#fff'; g.fillRect(-22, -22, 44, 44);
     g.beginPath(); g.moveTo(22, -22); g.lineTo(22, 22); g.lineTo(-22, 22); g.stroke(); g.restore();
     g.fillStyle = '#2a1a10'; quoteL.forEach(function (l, i) { g.fillText(l, W / 2, y + 66 + i * 56); });
-    y += hBubble + 40;
+    y += hBubble + 40 + gap * 0.2;
     // 캐릭터
     g.fillStyle = 'rgba(60,30,10,.18)'; g.beginPath(); g.ellipse(W / 2, y + hChar - 30, 220, 32, 0, 0, Math.PI * 2); g.fill();
-    if (main) { var s = Math.min((hChar - 10) / main.height, 620 / main.width); var mw = main.width * s, mh = main.height * s; g.drawImage(main, W / 2 - mw / 2, y + hChar - 20 - mh, mw, mh); }
-    y += hChar + 20;
+    if (main) { var s = Math.min((hChar - 10) / main.height, 820 / main.width); var mw = main.width * s, mh = main.height * s; g.drawImage(main, W / 2 - mw / 2, y + hChar - 20 - mh, mw, mh); }
+    y += hChar + 20 + gap * 0.6;
     // 명패 (사이트와 같은 검은 바탕 + 금색 테두리 + 양옆 구름)
     var pw = 520, ph = 170, px = W / 2 - pw / 2;
     g.fillStyle = '#5a2d1a'; round(g, px - 14, y - 14, pw + 28, ph + 28, 10); g.fill();
@@ -565,7 +569,7 @@
       g.fillStyle = '#2a1a10'; var t2 = t; while (g.measureText(t2).width > cwid - 20 && t2.length > 2) t2 = t2.slice(0, -1);
       g.fillText(t2, rx + cwid / 2, ry + 45);
     });
-    y += hChips;
+    y += hChips + gap * 1.2;
     // 두루마리 상자
     function box(h, fn) {
       g.fillStyle = '#fbf3df'; g.strokeStyle = '#cdb68a'; g.lineWidth = 3; round(g, P, y, IW, h, 22); g.fill(); g.stroke();
@@ -575,24 +579,6 @@
     function lines(arr, x, yy) { font(600, 34); g.fillStyle = '#2a1a10'; arr.forEach(function (l) { g.fillText(l, x, yy); yy += LH; }); return yy; }
     function head(t, x, yy, col) { font(900, 40); g.fillStyle = col || '#8f1d14'; g.fillText(t, x, yy); }
     box(hDesc, function (x, top) { head('직장에서는 이런 사람', x, top + 76); lines(descL, x, top + 140); });
-    box(hAdv, function (x, top) {
-      head(adv.h1, x, top + 76); var yy = lines(p1L, x, top + 140);
-      head(adv.h2, x, yy + 40, '#1f6f5c'); lines(p2L, x, yy + 104);
-    });
-    if (parts.length) box(hPart, function (x, top) {
-      head(label ? label + '과 잘 맞는 장수' : '같이 일하면 좋은 장수', x, top + 76);
-      var yy = top + 120;
-      parts.forEach(function (p, i) {
-        var rowH = Math.max(130, 70 + whyL[i].length * 38), im = pimgs[i];
-        g.fillStyle = '#efe3c8'; round(g, x, yy, 120, 120, 60); g.fill();
-        if (im) { g.save(); round(g, x, yy, 120, 120, 60); g.clip(); var s2 = 130 / im.width; g.drawImage(im, x + 60 - im.width * s2 / 2, yy - 4, im.width * s2, im.height * s2); g.restore(); }
-        var pc = byName(p.n);
-        font(900, 36); g.fillStyle = '#2a1a10'; g.fillText(p.n, x + 150, yy + 42);
-        var nw = g.measureText(p.n).width; font(600, 26); g.fillStyle = '#6b5238'; g.fillText(pc ? pc.sub : '', x + 166 + nw, yy + 42);
-        font(600, 26); g.fillStyle = '#2a1a10'; whyL[i].forEach(function (l, k) { g.fillText(l, x + 150, yy + 86 + k * 38); });
-        yy += rowH;
-      });
-    });
     // 맨 아래 주소
     font(700, 34); g.fillStyle = '#6b5238'; g.fillText('나도 테스트하기', W / 2, H - 120);
     font(900, 40); g.fillStyle = '#8f1d14'; g.fillText('samguk.overtimenote.kr', W / 2, H - 66);

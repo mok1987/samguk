@@ -270,7 +270,7 @@
     document.getElementById('again').onclick = function () { history.replaceState(null, '', location.pathname); state = newState(); chooseWho(); };
     document.getElementById('dex').onclick = dex;
     var sh = document.getElementById('share'); if (sh) sh.onclick = function () { share(c, isPeer, ctx.title); };
-    var sv = document.getElementById('save'); if (sv) sv.onclick = function () { saveImage(c); };
+    var sv = document.getElementById('save'); if (sv) sv.onclick = function () { saveImage(c, isPeer); };
   }
 
   // 조심할 점 + 개선 팁 (동료 모드면 '○○님과 일할 때' 문구)
@@ -334,31 +334,41 @@
     var t = (title || '').trim(); if (t && !/님$/.test(t)) t += '님';
     var text = isPeer ? '우리 팀 ' + (t || '그 분') + '은 ' + c.name + '(' + c.sub + ')래. 너희 팀엔 어떤 장수가 있어?'
                       : '회사에서 나는 ' + c.name + '(' + c.sub + ')래. 너는 어떤 장수야?';
-    if (navigator.share) navigator.share({ title: '직장 삼국지', text: text, url: url }).catch(function () {});
-    else if (navigator.clipboard) navigator.clipboard.writeText(text + ' ' + url).then(function () { alert('링크를 복사했어요. 카톡에 붙여 넣어 보세요.'); });
+    // 휴대폰 공유 창이 되면 그걸 쓰고, 안 되면(카톡 안 브라우저 등) 링크 복사 창을 띄움
+    if (navigator.share && !/KAKAOTALK/i.test(navigator.userAgent)) {
+      navigator.share({ title: '직장 삼국지', text: text, url: url }).catch(function (e) { if (!e || e.name !== 'AbortError') copySheet(text, url); });
+    } else copySheet(text, url);
   }
 
-  function saveImage(c) {
-    var cv = document.createElement('canvas'); cv.width = 1080; cv.height = 1350;
-    var g = cv.getContext('2d'), im = new Image();
-    im.onload = function () {
-      g.fillStyle = '#f4ecdc'; g.fillRect(0, 0, 1080, 1350);
-      g.fillStyle = '#b3352b'; g.font = '700 38px serif'; g.textAlign = 'center';
-      g.fillText('직장 삼국지 · ' + c.type, 540, 90);
-      g.fillStyle = '#6b5a47'; g.font = '34px sans-serif'; g.fillText('회사에서 나는', 540, 150);
-      var h = 640, w = im.width * h / im.height; g.drawImage(im, 540 - w / 2, 330, w, h);
-      // 말풍선
-      g.font = '700 40px serif'; var lines = wrap(g, '“' + c.quote + '”', 860);
-      var bh = 40 + lines.length * 54, by = 175;
-      g.fillStyle = '#fff'; g.strokeStyle = '#2a2018'; g.lineWidth = 5;
-      round(g, 90, by, 900, bh, 30); g.fill(); g.stroke();
-      g.fillStyle = '#2a2018'; lines.forEach(function (l, k) { g.fillText(l, 540, by + 62 + k * 54); });
-      g.font = '800 96px serif'; g.fillText(c.name, 540, 1090);
-      g.fillStyle = '#b3352b'; g.font = '700 46px sans-serif'; g.fillText(c.sub, 540, 1160);
-      g.fillStyle = '#6b5a47'; g.font = '30px sans-serif'; g.fillText('너는 어떤 장수? ' + SITE.replace(/^https?:\/\//, ''), 540, 1270);
-      var a = document.createElement('a'); a.download = '직장삼국지_' + c.name + '.png'; a.href = cv.toDataURL('image/png'); a.click();
+  function sheet(html) {
+    var bg = document.createElement('div'); bg.className = 'sheet-bg';
+    bg.innerHTML = '<div class="sheet">' + html + '<button class="btn btn-wood" data-close>닫기</button></div>';
+    bg.onclick = function (e) { if (e.target === bg || e.target.hasAttribute('data-close')) bg.remove(); };
+    document.body.appendChild(bg); return bg;
+  }
+  function copyText(t, ta) {
+    function legacy() { try { ta.focus(); ta.select(); ta.setSelectionRange(0, 99999); return document.execCommand('copy'); } catch (e) { return false; } }
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t).then(function () { return true; }, legacy);
+    return Promise.resolve(legacy());
+  }
+  function copySheet(text, url) {
+    var all = text + '\n' + url;
+    var bg = sheet('<h3>결과 공유하기</h3><p>아래 링크를 복사해서 카톡에 붙여 넣으세요. 받은 사람에게 내 장수 카드가 보여요.</p>' +
+      '<textarea readonly>' + esc(all) + '</textarea><button class="btn btn-palace" id="copyBtn" style="font-size:18px;padding:14px 50px">링크 복사</button><div class="done" id="copyMsg"></div>');
+    var ta = bg.querySelector('textarea');
+    bg.querySelector('#copyBtn').onclick = function () {
+      copyText(all, ta).then(function (ok) {
+        bg.querySelector('#copyMsg').textContent = ok ? '복사했어요! 카톡 대화방에 붙여 넣으세요.' : '복사가 안 되면 위 글을 길게 눌러 복사해 주세요.';
+      });
     };
-    im.src = img(c.name);
+  }
+
+  // 결과 이미지: 카톡 카드용으로 만든 장수 카드(img/share)를 그대로 보여 주고 길게 눌러 저장
+  function saveImage(c, isPeer) {
+    var src = 'img/share/' + SLUG[c.name] + (isPeer ? '-team' : '') + '.jpg';
+    var bg = sheet('<h3>결과 이미지</h3><p>이미지를 길게 눌러 <b>사진에 저장</b>하세요. PC에서는 아래 버튼으로 내려받을 수 있어요.</p>' +
+      '<img src="' + src + '" alt="' + esc(c.name) + ' 결과 이미지"><a class="btn btn-wood" id="dl" style="text-decoration:none">내려받기</a>');
+    var dl = bg.querySelector('#dl'); dl.href = src; dl.download = '직장삼국지_' + c.name + '.jpg';
   }
   function wrap(g, t, max) {
     var out = [], line = '';

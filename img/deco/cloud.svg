@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 64">
+  <!-- 상서로운 구름(祥雲) 무늬 -->
+  <g fill="none" stroke="#e2bb5c" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 52 H104"/>
+    <path d="M22 52 C10 52 8 36 20 34 C18 22 34 16 40 26 C42 12 64 8 68 22 C76 12 94 16 90 30 C104 30 108 48 96 52"/>
+    <path d="M40 40 C40 32 52 32 52 40 C52 46 44 46 45 41"/>
+    <path d="M66 38 C66 30 78 30 78 38 C78 44 70 44 71 39"/>
+  </g>
+</svg>

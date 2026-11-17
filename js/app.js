@@ -421,7 +421,7 @@
       wait(3000).then(function () { return null; })]);
   }
   // 결과 화면이 열리면 뒤에서 미리 만들어 두고, 저장 버튼은 만들어 둔 것을 바로 보여 줌
-  var imgCache = {};
+  var imgCache = {}, lastImgErr = '';
   function buildImage(c, isPeer, ctx) {
     ctx = ctx || {};
     var label = isPeer ? (ctx.title ? ctx.title + '님' : '그 분') : '';  // 실명은 넣지 않음
@@ -438,18 +438,24 @@
     } catch (e) {}
     fontsReady = Promise.race([fontsReady, wait(1500)]);
     var name = '직장삼국지_' + c.name + '.jpg';
-    var job = Promise.all([fontsReady, loadImg(img(c.name)), loadImg('img/deco/cloud.svg'), loadImg('img/deco/bg-cloud.svg')].concat(parts.map(function (p) { return loadImg(img(p.n)); })))
+    var job = Promise.all([fontsReady, loadImg(img(c.name)), loadImg('img/deco/cloud.png'), loadImg('img/deco/bg-cloud.png')].concat(parts.map(function (p) { return loadImg(img(p.n)); })))
       .then(function (r) {
-        var canvas = drawResult(c, label, adv, parts, r[1], r.slice(4), r[2], r[3]);
-        return new Promise(function (ok, no) {
-          function fromDataURL() {
-            var d = canvas.toDataURL('image/jpeg', 0.88), bin = atob(d.split(',')[1]), arr = new Uint8Array(bin.length);
-            for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-            ok(new Blob([arr], { type: 'image/jpeg' }));
-          }
-          try { if (canvas.toBlob) canvas.toBlob(function (bl) { if (bl) ok(bl); else { try { fromDataURL(); } catch (e) { no(e); } } }, 'image/jpeg', 0.88); else fromDataURL(); }
-          catch (e) { no(e); }
-        });
+        // 1차: 장식 포함, 실패하면 2차: 장식 빼고, 그래도 실패하면 3차: 그림 없이 글만
+        var tries = [[r[1], r.slice(4), r[2], r[3]], [r[1], r.slice(4), null, null], [null, [], null, null]];
+        function attempt(i) {
+          var t = tries[i];
+          return new Promise(function (ok, no) {
+            try {
+              var canvas = drawResult(c, label, adv, parts, t[0], t[1], t[2], t[3]);
+              var d = canvas.toDataURL('image/jpeg', 0.88);
+              if (!d || d.length < 1000) throw new Error('빈 이미지');
+              var bin = atob(d.split(',')[1]), arr = new Uint8Array(bin.length);
+              for (var k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+              ok(new Blob([arr], { type: 'image/jpeg' }));
+            } catch (e) { lastImgErr = (i + 1) + ':' + (e && (e.name || e.message) || e); no(e); }
+          }).catch(function (e) { if (i < tries.length - 1) return attempt(i + 1); throw e; });
+        }
+        return attempt(0);
       })
       .then(function (blob) {
         var file = null; try { file = new File([blob], name, { type: 'image/jpeg' }); } catch (e) {}
@@ -465,10 +471,10 @@
     var card = 'img/share/' + SLUG[c.name] + (isPeer ? '-team' : '') + '.jpg';
     function fallback() {  // 기기에서 그리기가 안 되면 기존 장수 카드라도 보여 줌
       if (box.innerHTML) return;
-      msg.innerHTML = '이 기기에서는 전체 이미지를 만들지 못했어요. 장수 카드를 길게 눌러 저장하거나 화면을 캡처해 주세요.';
+      msg.innerHTML = '이 기기에서는 전체 이미지를 만들지 못했어요. 장수 카드를 길게 눌러 저장하거나 화면을 캡처해 주세요.' + (lastImgErr ? '<br><small style="opacity:.5">(' + esc(lastImgErr) + ')</small>' : '');
       box.innerHTML = '<img src="' + card + '" alt=""><a class="btn btn-wood" style="text-decoration:none" href="' + card + '" download="직장삼국지_' + esc(c.name) + '.jpg">내려받기</a>';
     }
-    var timer = setTimeout(fallback, 8000);
+    var timer = setTimeout(function () { if (!lastImgErr) lastImgErr = '시간 초과'; fallback(); }, 15000);
     buildImage(c, isPeer, ctx).then(function (o) {
       clearTimeout(timer);
       if (box.innerHTML) return;
@@ -500,7 +506,7 @@
     cv.width = W; cv.height = H;
     // 배경 (사이트와 같은 구름 무늬)
     g.fillStyle = '#efe3c8'; g.fillRect(0, 0, W, H);
-    if (cloudBg) { try { var pt = g.createPattern(cloudBg, 'repeat'); g.save(); g.scale(2.25, 2.25); g.fillStyle = pt; g.fillRect(0, 0, W, H); g.restore(); } catch (e) {} }
+    if (cloudBg) { try { var pt = g.createPattern(cloudBg, 'repeat'); g.fillStyle = pt; g.fillRect(0, 0, W, H); } catch (e) {} }
     var grd = g.createRadialGradient(W / 2, 0, 50, W / 2, 0, 900); grd.addColorStop(0, 'rgba(255,250,235,.7)'); grd.addColorStop(1, 'rgba(255,250,235,0)');
     g.fillStyle = grd; g.fillRect(0, 0, W, 900);
     // 단청 띠 (위·아래)

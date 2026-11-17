@@ -293,10 +293,10 @@
   function yageunHTML(c, isPeer) {
     var L = yageunLink();
     return '<a class="yageun" href="' + L.url + '" target="_blank" rel="noopener"><img class="yicon" src="img/ui/yageun-icon.webp" alt="야근수첩"><span>' +
-      '<b>' + (isPeer ? esc(c.name) + '형과 일하다 늘어난 야근,<br>야근수첩에서 기록해 보세요' : '직장인의 야근 기록,<br>야근수첩에서 기록해 보세요') + '</b>' +
-      '<p>잠금화면 버튼 한 번으로 퇴근·야근 시간이 남아요.</p></span>' +
-      '<em class="ycta">' + esc(L.cta) + ' ›</em></a>';
+      '<b>' + esc(c.name) + '의 야근 기록, 야근수첩에서 기록해 보세요</b>' +
+      '<em class="ycta">' + esc(L.cta) + ' ›</em></span></a>';
   }
+
 
 
   // 조심할 점 + 개선 팁 (동료 모드면 '○○님과 일할 때' 문구)

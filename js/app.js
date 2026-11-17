@@ -4,6 +4,19 @@
   var app = document.getElementById('app');
   var SITE = location.origin + location.pathname;
   var YAGEUN_URL = 'https://overtimenote.kr';
+  // 야근수첩 출시 상태: 스토어 주소가 생기면 여기만 채우면 배너가 휴대폰 종류에 맞게 바뀜
+  var YAGEUN_STORE = {
+    android: '',   // 예: 'https://play.google.com/store/apps/details?id=...'  (플레이 스토어 출시 후)
+    ios: ''        // 예: 'https://apps.apple.com/kr/app/...'                  (앱스토어 출시 후)
+  };
+  function yageunLink() {
+    var ua = navigator.userAgent, isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var isAnd = /Android/i.test(ua);
+    if (isAnd && YAGEUN_STORE.android) return { url: YAGEUN_STORE.android, tag: '플레이 스토어에서 받기' };
+    if (isIOS && YAGEUN_STORE.ios) return { url: YAGEUN_STORE.ios, tag: '앱스토어에서 받기' };
+    if (isIOS && YAGEUN_STORE.android) return { url: YAGEUN_URL, tag: '아이폰 버전 준비 중' };
+    return { url: YAGEUN_URL, tag: '곧 출시' };
+  }
 
   // 캐릭터별 결과 화면 동작 (이미지 1장을 통째로 움직임)
   var MOTION = {
@@ -274,7 +287,8 @@
 
   // 야근수첩 배너 (결과 화면 위·아래 두 곳)
   function yageunHTML(c, isPeer) {
-    return '<a class="yageun" href="' + YAGEUN_URL + '" target="_blank" rel="noopener"><img class="yicon" src="img/ui/yageun-icon.webp" alt="야근수첩"><span><b>' +
+    var L = yageunLink();
+    return '<a class="yageun" href="' + L.url + '" target="_blank" rel="noopener"><img class="yicon" src="img/ui/yageun-icon.webp" alt="야근수첩"><span><em class="ytag">' + L.tag + '</em><b>' +
       (isPeer ? esc(c.name) + '형과 일하다 늘어난 야근, 야근수첩' : esc(c.name) + '형 직장인의 야근 관리, 야근수첩') +
       '</b><p>' + esc(isPeer ? '누구 때문에 늦게 퇴근했는지, 오늘 야근부터 잠금화면 버튼 한 번으로 남겨 두세요.' : (YAGEUN[c.type] || '')) + '</p></span></a>';
   }

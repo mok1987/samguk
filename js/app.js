@@ -285,7 +285,7 @@
     document.getElementById('dex').onclick = dex;
     var sh = document.getElementById('share'); if (sh) sh.onclick = function () { share(c, isPeer, ctx.title); };
     var sh2 = document.getElementById('share2'); if (sh2) sh2.onclick = function () { share(c, isPeer, ctx.title, true); };
-    var sv = document.getElementById('save'); if (sv) sv.onclick = function () { saveImage(c, isPeer, ctx); };
+    var sv = document.getElementById('save'); if (sv) { sv.onclick = function () { saveImage(c, isPeer, ctx); }; setTimeout(function () { buildImage(c, isPeer, ctx).catch(function () {}); }, 1500); }
   }
 
   // 야근수첩 배너 (결과 화면 위·아래 두 곳)
@@ -415,40 +415,71 @@
   }
 
   // 결과 이미지: 결과 화면 내용을 캔버스로 세로형 이미지(1080px 폭)로 그려서 저장
-  function loadImg(src) {
-    return new Promise(function (ok) { var im = new Image(); im.onload = function () { ok(im); }; im.onerror = function () { ok(null); }; im.src = src; });
+  function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+  function loadImg(src) {  // 3초 안에 안 오면 그 그림은 빼고 그림
+    return Promise.race([new Promise(function (ok) { var im = new Image(); im.onload = function () { ok(im); }; im.onerror = function () { ok(null); }; im.src = src; }),
+      wait(3000).then(function () { return null; })]);
   }
-  function saveImage(c, isPeer, ctx) {
+  // 결과 화면이 열리면 뒤에서 미리 만들어 두고, 저장 버튼은 만들어 둔 것을 바로 보여 줌
+  var imgCache = {};
+  function buildImage(c, isPeer, ctx) {
     ctx = ctx || {};
-    var bg = sheet('<h3>결과 이미지</h3><p id="saveMsg">이미지를 만드는 중이에요…</p><div id="saveBox"></div>');
     var label = isPeer ? (ctx.title ? ctx.title + '님' : '그 분') : '';  // 실명은 넣지 않음
+    var key = c.name + '|' + label;
+    if (imgCache[key]) return imgCache[key];
     var adv = { h1: isPeer ? label + '과 일할 때 알아 둘 점' : '이런 점은 조심해요', p1: c.caution,
       h2: isPeer ? '이렇게 해 보세요' : '이렇게 바꿔 보세요', p2: isPeer ? c.tipPeer : c.tipSelf };
     var parts = (c.partners || []).slice(0, 4);
-    var allText = '직장 삼국지회사에서당신은' + label + c.type + c.name + c.sub + c.quote + c.traits.join('') + c.desc + adv.h1 + adv.p1 + adv.h2 + adv.p2 +
-      '같이 일하면 좋은 장수잘 맞는' + parts.map(function (p) { return p.n + p.why; }).join('') + (HANJA[c.name] || '') + 'samguk.overtimenote.kr나도테스트하기0123456789';
-    var fontsReady = (document.fonts && document.fonts.load) ? Promise.all([
-      document.fonts.load('900 60px "Noto Serif KR"', allText), document.fonts.load('700 40px "Noto Serif KR"', allText),
-      document.fonts.load('600 30px "Noto Serif KR"', allText)]).catch(function () {}) : Promise.resolve();
-    fontsReady = Promise.race([fontsReady, new Promise(function (ok) { setTimeout(ok, 3000); })]);  // 글꼴이 늦으면 3초 뒤 그냥 그림
-    Promise.all([fontsReady, loadImg(img(c.name)), loadImg('img/deco/cloud.svg'), loadImg('img/deco/bg-cloud.svg')].concat(parts.map(function (p) { return loadImg(img(p.n)); }))).then(function (r) {
-      var main = r[1], pimgs = r.slice(4);
-      var canvas = drawResult(c, label, adv, parts, main, pimgs, r[2], r[3]);
-      var msg = bg.querySelector('#saveMsg'), box = bg.querySelector('#saveBox');
-      var name = '직장삼국지_' + c.name + '.png';
-      canvas.toBlob(function (blob) {
-        if (!blob) { msg.textContent = '이미지를 만들지 못했어요. 화면을 캡처해 주세요.'; return; }
-        var url = URL.createObjectURL(blob);
-        var file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
-        var canFile = file && navigator.canShare && navigator.canShare({ files: [file] });
-        msg.innerHTML = '이미지를 길게 눌러 <b>사진에 저장</b>하세요.' + (canFile ? ' 아래 버튼으로 저장·공유할 수도 있어요.' : ' PC에서는 내려받기를 누르세요.');
-        box.innerHTML = '<img src="' + url + '" alt="' + esc(c.name) + ' 결과 이미지">' +
-          (canFile ? '<button class="btn btn-palace" id="shareImg" style="font-size:18px;padding:14px 40px">사진 저장 · 공유</button>' : '') +
-          '<a class="btn btn-wood" id="dl" style="text-decoration:none" href="' + url + '" download="' + name + '">내려받기</a>';
-        var si = box.querySelector('#shareImg');
-        if (si) si.onclick = function () { navigator.share({ files: [file] }).catch(function () {}); };
-      }, 'image/png');
-    });
+    var fontsReady = Promise.resolve();
+    try {
+      if (document.fonts && document.fonts.load) fontsReady = Promise.all([
+        document.fonts.load('900 60px "Noto Serif KR"', c.name + c.type), document.fonts.load('700 40px "Noto Serif KR"', c.quote),
+        document.fonts.load('600 30px "Noto Serif KR"', c.desc)]).catch(function () {});
+    } catch (e) {}
+    fontsReady = Promise.race([fontsReady, wait(1500)]);
+    var name = '직장삼국지_' + c.name + '.jpg';
+    var job = Promise.all([fontsReady, loadImg(img(c.name)), loadImg('img/deco/cloud.svg'), loadImg('img/deco/bg-cloud.svg')].concat(parts.map(function (p) { return loadImg(img(p.n)); })))
+      .then(function (r) {
+        var canvas = drawResult(c, label, adv, parts, r[1], r.slice(4), r[2], r[3]);
+        return new Promise(function (ok, no) {
+          function fromDataURL() {
+            var d = canvas.toDataURL('image/jpeg', 0.88), bin = atob(d.split(',')[1]), arr = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            ok(new Blob([arr], { type: 'image/jpeg' }));
+          }
+          try { if (canvas.toBlob) canvas.toBlob(function (bl) { if (bl) ok(bl); else { try { fromDataURL(); } catch (e) { no(e); } } }, 'image/jpeg', 0.88); else fromDataURL(); }
+          catch (e) { no(e); }
+        });
+      })
+      .then(function (blob) {
+        var file = null; try { file = new File([blob], name, { type: 'image/jpeg' }); } catch (e) {}
+        return { url: URL.createObjectURL(blob), file: file, name: name };
+      });
+    job.catch(function () { delete imgCache[key]; });
+    imgCache[key] = job;
+    return job;
+  }
+  function saveImage(c, isPeer, ctx) {
+    var bg = sheet('<h3>결과 이미지</h3><p id="saveMsg">이미지를 만드는 중이에요…</p><div id="saveBox"></div>');
+    var msg = bg.querySelector('#saveMsg'), box = bg.querySelector('#saveBox');
+    var card = 'img/share/' + SLUG[c.name] + (isPeer ? '-team' : '') + '.jpg';
+    function fallback() {  // 기기에서 그리기가 안 되면 기존 장수 카드라도 보여 줌
+      if (box.innerHTML) return;
+      msg.innerHTML = '이 기기에서는 전체 이미지를 만들지 못했어요. 장수 카드를 길게 눌러 저장하거나 화면을 캡처해 주세요.';
+      box.innerHTML = '<img src="' + card + '" alt=""><a class="btn btn-wood" style="text-decoration:none" href="' + card + '" download="직장삼국지_' + esc(c.name) + '.jpg">내려받기</a>';
+    }
+    var timer = setTimeout(fallback, 8000);
+    buildImage(c, isPeer, ctx).then(function (o) {
+      clearTimeout(timer);
+      if (box.innerHTML) return;
+      var canFile = false; try { canFile = o.file && navigator.canShare && navigator.canShare({ files: [o.file] }); } catch (e) {}
+      msg.innerHTML = '이미지를 길게 눌러 <b>사진에 저장</b>하세요.' + (canFile ? ' 아래 버튼으로 저장·공유할 수도 있어요.' : ' PC에서는 내려받기를 누르세요.');
+      box.innerHTML = '<img src="' + o.url + '" alt="' + esc(c.name) + ' 결과 이미지">' +
+        (canFile ? '<button class="btn btn-palace" id="shareImg" style="font-size:18px;padding:14px 40px">사진 저장 · 공유</button>' : '') +
+        '<a class="btn btn-wood" id="dl" style="text-decoration:none" href="' + o.url + '" download="' + o.name + '">내려받기</a>';
+      var si = box.querySelector('#shareImg');
+      if (si) si.onclick = function () { navigator.share({ files: [o.file] }).catch(function () {}); };
+    }, function () { clearTimeout(timer); fallback(); });
   }
   function drawResult(c, label, adv, parts, main, pimgs, cloud, cloudBg) {
     var W = 1080, P = 70, IW = W - P * 2, SERIF = '"Noto Serif KR","Noto Serif CJK KR","AppleMyungjo",serif';

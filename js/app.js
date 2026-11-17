@@ -4,6 +4,9 @@
   var app = document.getElementById('app');
   var SITE = location.origin + location.pathname;
   var YAGEUN_URL = 'https://overtimenote.kr';
+  // 카카오톡 공유 (카카오 개발자 사이트의 JavaScript 키, 사이트에 공개되는 키)
+  var KAKAO_JS_KEY = '0bf5e76f4eb1b98045f0bcdc481b333b';
+  try { if (window.Kakao && !Kakao.isInitialized()) Kakao.init(KAKAO_JS_KEY); } catch (e) {}
   // 야근수첩 출시 상태: 스토어 주소가 생기면 여기만 채우면 배너가 휴대폰 종류에 맞게 바뀜
   var YAGEUN_STORE = {
     android: '',   // 예: 'https://play.google.com/store/apps/details?id=...'  (플레이 스토어 출시 후)
@@ -268,7 +271,8 @@
       (sim ? '<div class="scroll"><h3>' + (isPeer ? '그 분과 닮은 장수' : '나와 닮은 장수') + '</h3><div class="similar">' + sim + '</div><p class="note">매칭 점수는 앱 안에서 계산한 재미용 점수예요.</p></div>' : '') +
       '<div class="actions">' +
       (shared ? palaceBtn('again', '出 征', '나도 해 보기') :
-        palaceBtn('share', '傳 令', '결과 공유하기') +
+        palaceBtn('share', '傳 令', '카카오톡으로 공유') +
+        '<button class="link-share" id="share2">링크 복사 · 다른 앱으로 공유</button>' +
         '<div class="row"><button class="btn btn-wood" id="save">이미지 저장</button><button class="btn btn-wood" id="again">' + (isPeer ? '다른 사람 보기' : '다시 하기') + '</button></div>') +
       '<button class="btn btn-wood" id="dex">30인 장수 도감</button></div>' +
       yageunHTML(c, isPeer) +
@@ -282,6 +286,7 @@
     document.getElementById('again').onclick = function () { history.replaceState(null, '', location.pathname); state = newState(); chooseWho(); };
     document.getElementById('dex').onclick = dex;
     var sh = document.getElementById('share'); if (sh) sh.onclick = function () { share(c, isPeer, ctx.title); };
+    var sh2 = document.getElementById('share2'); if (sh2) sh2.onclick = function () { share(c, isPeer, ctx.title, true); };
     var sv = document.getElementById('save'); if (sv) sv.onclick = function () { saveImage(c, isPeer); };
   }
 
@@ -347,14 +352,38 @@
     '양수':'yangsu','십상시':'sipsangsi','제갈량':'jegallyang','주유':'juyu','방통':'bangtong','육손':'yukson','관우':'gwanu','조운':'jowun',
     '하후돈':'hahudon','전위':'jeonwi','장비':'jangbi','마초':'macho','여포':'yeopo','맹획':'maenghoek','황충':'hwangchung','화타':'hwata',
     '강유':'gangyu','위연':'wiyeon','황건적':'hwanggeonjeok','원술':'wonsul','원소':'wonso','마속':'masok'};
-  function share(c, isPeer, title) {
+  function share(c, isPeer, title, other) {
     var base = SITE.replace(/index\.html$/, '');
     var url = base + 'r/' + SLUG[c.name] + (isPeer ? '-team' : '') + '.html';
     // 공유 문구에는 실명을 넣지 않고 직함만 씀
     var t = (title || '').trim(); if (t && !/님$/.test(t)) t += '님';
     var text = isPeer ? '우리 팀 ' + (t || '그 분') + '은 ' + c.name + '(' + c.sub + ')래. 너희 팀엔 어떤 장수가 있어?'
                       : '회사에서 나는 ' + c.name + '(' + c.sub + ')래. 너는 어떤 장수야?';
-    // 휴대폰 공유 창이 되면 그걸 쓰고, 안 되면(카톡 안 브라우저 등) 링크 복사 창을 띄움
+    if (other) return otherShare(text, url);
+    // 1순위: 카카오톡 공유(장수 카드 + '결과 보기'·'나도 테스트하기' 버튼)
+    var img = base + 'img/share/' + SLUG[c.name] + (isPeer ? '-team' : '') + '.jpg';
+    try {
+      if (window.Kakao && Kakao.isInitialized() && Kakao.Share) {
+        Kakao.Share.sendDefault({
+          objectType: 'feed',
+          content: {
+            title: isPeer ? '우리 팀 ' + (t || '그 분') + '은 ' + c.name + '(' + c.sub + ')' : '회사에서 나는 ' + c.name + ', ' + c.sub,
+            description: '“' + c.quote + '” · 일하는 방식으로 알아보는 직장 삼국지',
+            imageUrl: img, imageWidth: 1200, imageHeight: 630,
+            link: { mobileWebUrl: url, webUrl: url }
+          },
+          buttons: [
+            { title: '결과 보기', link: { mobileWebUrl: url, webUrl: url } },
+            { title: '나도 테스트하기', link: { mobileWebUrl: base, webUrl: base } }
+          ]
+        });
+        return;
+      }
+    } catch (e) {}
+    otherShare(text, url);
+  }
+  // 2순위: 휴대폰 공유 창, 3순위: 링크 복사 창
+  function otherShare(text, url) {
     if (navigator.share && !/KAKAOTALK/i.test(navigator.userAgent)) {
       navigator.share({ title: '직장 삼국지', text: text, url: url }).catch(function (e) { if (!e || e.name !== 'AbortError') copySheet(text, url); });
     } else copySheet(text, url);

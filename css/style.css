@@ -303,3 +303,4 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .sheet img{display:block;width:100%;border-radius:8px;margin-bottom:12px;box-shadow:0 3px 8px rgba(0,0,0,.2)}
 .sheet .btn{margin-bottom:8px}
 .sheet .done{color:var(--jade);font-weight:700;font-size:14px;text-align:center;min-height:20px}
+.link-share{display:block;margin:-2px auto 4px;font-size:14px;font-weight:600;color:var(--ink2);text-decoration:underline;padding:6px}

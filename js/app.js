@@ -5,7 +5,7 @@
   var SITE = location.origin + location.pathname;
   var YAGEUN_URL = 'https://overtimenote.kr';
   // 카카오톡 공유 (카카오 개발자 사이트의 JavaScript 키, 사이트에 공개되는 키)
-  var KAKAO_JS_KEY = '0bf5e76f4eb1b98045f0bcdc481b333b';
+  var KAKAO_JS_KEY = '523d5866bf18feffdf65fdfd3df72bc8';  // '직장삼국지 웹' 키 (JS SDK 도메인 등록된 키)
   try { if (window.Kakao && !Kakao.isInitialized()) Kakao.init(KAKAO_JS_KEY); } catch (e) {}
   // 야근수첩 출시 상태: 스토어 주소가 생기면 여기만 채우면 배너가 휴대폰 종류에 맞게 바뀜
   var YAGEUN_STORE = {

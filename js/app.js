@@ -285,7 +285,7 @@
     document.getElementById('dex').onclick = dex;
     var sh = document.getElementById('share'); if (sh) sh.onclick = function () { share(c, isPeer, ctx.title); };
     var sh2 = document.getElementById('share2'); if (sh2) sh2.onclick = function () { share(c, isPeer, ctx.title, true); };
-    var sv = document.getElementById('save'); if (sv) sv.onclick = function () { saveImage(c, isPeer); };
+    var sv = document.getElementById('save'); if (sv) sv.onclick = function () { saveImage(c, isPeer, ctx); };
   }
 
   // 야근수첩 배너 (결과 화면 위·아래 두 곳)
@@ -414,17 +414,164 @@
     };
   }
 
-  // 결과 이미지: 카톡 카드용으로 만든 장수 카드(img/share)를 그대로 보여 주고 길게 눌러 저장
-  function saveImage(c, isPeer) {
-    var src = 'img/share/' + SLUG[c.name] + (isPeer ? '-team' : '') + '.jpg';
-    var bg = sheet('<h3>결과 이미지</h3><p>이미지를 길게 눌러 <b>사진에 저장</b>하세요. PC에서는 아래 버튼으로 내려받을 수 있어요.</p>' +
-      '<img src="' + src + '" alt="' + esc(c.name) + ' 결과 이미지"><a class="btn btn-wood" id="dl" style="text-decoration:none">내려받기</a>');
-    var dl = bg.querySelector('#dl'); dl.href = src; dl.download = '직장삼국지_' + c.name + '.jpg';
+  // 결과 이미지: 결과 화면 내용을 캔버스로 세로형 이미지(1080px 폭)로 그려서 저장
+  function loadImg(src) {
+    return new Promise(function (ok) { var im = new Image(); im.onload = function () { ok(im); }; im.onerror = function () { ok(null); }; im.src = src; });
   }
+  function saveImage(c, isPeer, ctx) {
+    ctx = ctx || {};
+    var bg = sheet('<h3>결과 이미지</h3><p id="saveMsg">이미지를 만드는 중이에요…</p><div id="saveBox"></div>');
+    var label = isPeer ? (ctx.title ? ctx.title + '님' : '그 분') : '';  // 실명은 넣지 않음
+    var adv = { h1: isPeer ? label + '과 일할 때 알아 둘 점' : '이런 점은 조심해요', p1: c.caution,
+      h2: isPeer ? '이렇게 해 보세요' : '이렇게 바꿔 보세요', p2: isPeer ? c.tipPeer : c.tipSelf };
+    var parts = (c.partners || []).slice(0, 4);
+    var allText = '직장 삼국지회사에서당신은' + label + c.type + c.name + c.sub + c.quote + c.traits.join('') + c.desc + adv.h1 + adv.p1 + adv.h2 + adv.p2 +
+      '같이 일하면 좋은 장수잘 맞는' + parts.map(function (p) { return p.n + p.why; }).join('') + (HANJA[c.name] || '') + 'samguk.overtimenote.kr나도테스트하기0123456789';
+    var fontsReady = (document.fonts && document.fonts.load) ? Promise.all([
+      document.fonts.load('900 60px "Noto Serif KR"', allText), document.fonts.load('700 40px "Noto Serif KR"', allText),
+      document.fonts.load('600 30px "Noto Serif KR"', allText)]).catch(function () {}) : Promise.resolve();
+    fontsReady = Promise.race([fontsReady, new Promise(function (ok) { setTimeout(ok, 3000); })]);  // 글꼴이 늦으면 3초 뒤 그냥 그림
+    Promise.all([fontsReady, loadImg(img(c.name)), loadImg('img/deco/cloud.svg'), loadImg('img/deco/bg-cloud.svg')].concat(parts.map(function (p) { return loadImg(img(p.n)); }))).then(function (r) {
+      var main = r[1], pimgs = r.slice(4);
+      var canvas = drawResult(c, label, adv, parts, main, pimgs, r[2], r[3]);
+      var msg = bg.querySelector('#saveMsg'), box = bg.querySelector('#saveBox');
+      var name = '직장삼국지_' + c.name + '.png';
+      canvas.toBlob(function (blob) {
+        if (!blob) { msg.textContent = '이미지를 만들지 못했어요. 화면을 캡처해 주세요.'; return; }
+        var url = URL.createObjectURL(blob);
+        var file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
+        var canFile = file && navigator.canShare && navigator.canShare({ files: [file] });
+        msg.innerHTML = '이미지를 길게 눌러 <b>사진에 저장</b>하세요.' + (canFile ? ' 아래 버튼으로 저장·공유할 수도 있어요.' : ' PC에서는 내려받기를 누르세요.');
+        box.innerHTML = '<img src="' + url + '" alt="' + esc(c.name) + ' 결과 이미지">' +
+          (canFile ? '<button class="btn btn-palace" id="shareImg" style="font-size:18px;padding:14px 40px">사진 저장 · 공유</button>' : '') +
+          '<a class="btn btn-wood" id="dl" style="text-decoration:none" href="' + url + '" download="' + name + '">내려받기</a>';
+        var si = box.querySelector('#shareImg');
+        if (si) si.onclick = function () { navigator.share({ files: [file] }).catch(function () {}); };
+      }, 'image/png');
+    });
+  }
+  function drawResult(c, label, adv, parts, main, pimgs, cloud, cloudBg) {
+    var W = 1080, P = 70, IW = W - P * 2, SERIF = '"Noto Serif KR","Noto Serif CJK KR","AppleMyungjo",serif';
+    var cv = document.createElement('canvas'), g = cv.getContext('2d');
+    function font(w, s) { g.font = w + ' ' + s + 'px ' + SERIF; }
+    // 1차: 높이 계산용으로 글 줄 나누기
+    cv.width = W; cv.height = 10;
+    font(600, 34); var descL = wrap(g, c.desc, IW - 80), p1L = wrap(g, adv.p1, IW - 80), p2L = wrap(g, adv.p2, IW - 80);
+    font(600, 26); var whyL = parts.map(function (p) { return wrap(g, p.why, IW - 230).slice(0, 2); });
+    font(700, 40); var quoteL = wrap(g, '“' + c.quote + '”', IW - 120);
+    font(600, 32); var chipRows = Math.ceil(c.traits.length / 3);
+    var LH = 52;
+    var hBubble = 60 + quoteL.length * 56, hChar = 600;
+    var hHead = 330 + hBubble, hPlate = 330, hChips = chipRows * 84 + 50;
+    var hDesc = 130 + descL.length * LH, hAdv = 230 + (p1L.length + p2L.length) * LH;
+    var hPart = parts.length ? 130 + whyL.reduce(function (a, w) { return a + Math.max(130, 70 + w.length * 38); }, 0) : 0;
+    var H = hHead + hChar + hPlate + hChips + hDesc + 40 + hAdv + 40 + hPart + 40 + 190;
+    cv.width = W; cv.height = H;
+    // 배경 (사이트와 같은 구름 무늬)
+    g.fillStyle = '#efe3c8'; g.fillRect(0, 0, W, H);
+    if (cloudBg) { try { var pt = g.createPattern(cloudBg, 'repeat'); g.save(); g.scale(2.25, 2.25); g.fillStyle = pt; g.fillRect(0, 0, W, H); g.restore(); } catch (e) {} }
+    var grd = g.createRadialGradient(W / 2, 0, 50, W / 2, 0, 900); grd.addColorStop(0, 'rgba(255,250,235,.7)'); grd.addColorStop(1, 'rgba(255,250,235,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, W, 900);
+    // 단청 띠 (위·아래)
+    function band(y) {
+      var cols = [['#1f6f5c', 36], ['#e2bb5c', 6], ['#c23b2c', 18], ['#e2bb5c', 6], ['#2f4f8f', 30], ['#e2bb5c', 6]];
+      for (var x = 0; x < W;) { for (var i = 0; i < cols.length && x < W; i++) { g.fillStyle = cols[i][0]; g.fillRect(x, y, cols[i][1], 30); x += cols[i][1]; } }
+      g.fillStyle = '#e2bb5c'; g.fillRect(0, y, W, 4); g.fillStyle = '#8f1d14'; g.fillRect(0, y + 26, W, 6);
+    }
+    band(0); band(H - 32);
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    function seal(t, cy, size, padX, h) {
+      font(800, size); var w = g.measureText(t).width + padX * 2;
+      g.fillStyle = '#b3352b'; round(g, W / 2 - w / 2, cy, w, h, 6); g.fill();
+      g.strokeStyle = 'rgba(255,240,210,.6)'; g.lineWidth = 3; round(g, W / 2 - w / 2 + 5, cy + 5, w - 10, h - 10, 4); g.stroke();
+      g.fillStyle = '#fff4dc'; g.fillText(t, W / 2, cy + h / 2 + size * 0.36);
+    }
+    var y = 105;
+    font(900, 52); g.fillStyle = '#8f1d14'; g.fillText('직장 삼국지', W / 2, y);
+    y += 40; seal(c.type, y, 34, 26, 64);
+    y += 120; font(600, 38); g.fillStyle = '#6b5238';
+    g.fillText(label ? '회사에서 ' + label + '은' : '회사에서 당신은', W / 2, y);
+    // 말풍선
+    y += 40; font(700, 40);
+    var bw = Math.max.apply(null, quoteL.map(function (l) { return g.measureText(l).width; })) + 80, bh = hBubble - 30, bx = W / 2 - bw / 2;
+    g.fillStyle = '#2a1a10'; round(g, bx + 8, y + 10, bw, bh, 44); g.fill();
+    g.fillStyle = '#fff'; g.strokeStyle = '#2a1a10'; g.lineWidth = 6; round(g, bx, y, bw, bh, 44); g.fill(); g.stroke();
+    g.save(); g.translate(W / 2, y + bh); g.rotate(Math.PI / 4); g.fillStyle = '#fff'; g.fillRect(-22, -22, 44, 44);
+    g.beginPath(); g.moveTo(22, -22); g.lineTo(22, 22); g.lineTo(-22, 22); g.stroke(); g.restore();
+    g.fillStyle = '#2a1a10'; quoteL.forEach(function (l, i) { g.fillText(l, W / 2, y + 66 + i * 56); });
+    y += hBubble + 40;
+    // 캐릭터
+    g.fillStyle = 'rgba(60,30,10,.18)'; g.beginPath(); g.ellipse(W / 2, y + hChar - 30, 220, 32, 0, 0, Math.PI * 2); g.fill();
+    if (main) { var s = Math.min((hChar - 10) / main.height, 620 / main.width); var mw = main.width * s, mh = main.height * s; g.drawImage(main, W / 2 - mw / 2, y + hChar - 20 - mh, mw, mh); }
+    y += hChar + 20;
+    // 명패 (사이트와 같은 검은 바탕 + 금색 테두리 + 양옆 구름)
+    var pw = 520, ph = 170, px = W / 2 - pw / 2;
+    g.fillStyle = '#5a2d1a'; round(g, px - 14, y - 14, pw + 28, ph + 28, 10); g.fill();
+    g.fillStyle = '#c9a24a'; round(g, px - 6, y - 6, pw + 12, ph + 12, 8); g.fill();
+    var pg = g.createLinearGradient(0, y, 0, y + ph); pg.addColorStop(0, '#3b2418'); pg.addColorStop(1, '#1e110a');
+    g.fillStyle = pg; round(g, px, y, pw, ph, 6); g.fill();
+    g.strokeStyle = 'rgba(226,187,92,.55)'; g.lineWidth = 3; round(g, px + 12, y + 12, pw - 24, ph - 24, 4); g.stroke();
+    if (cloud) { g.drawImage(cloud, px - 130, y + ph / 2 - 26, 104, 52); g.save(); g.translate(px + pw + 130, 0); g.scale(-1, 1); g.drawImage(cloud, 0, y + ph / 2 - 26, 104, 52); g.restore(); }
+    font(600, 30); g.fillStyle = 'rgba(226,187,92,.85)';
+    var hj = (HANJA[c.name] || '').split('').join('   '); g.fillText(hj, W / 2, y + 55);
+    font(900, 84); var ng = g.createLinearGradient(0, y + 70, 0, y + 150); ng.addColorStop(0, '#fff2c4'); ng.addColorStop(.55, '#e2bb5c'); ng.addColorStop(1, '#b8862c');
+    g.fillStyle = ng; g.fillText(c.name, W / 2, y + 145);
+    y += ph + 50; seal(c.sub, y, 38, 30, 72);
+    y += 110;
+    // 칩 (한 줄에 3개)
+    font(600, 32); var gap = 16, cwid = (IW - gap * 2) / 3;
+    c.traits.forEach(function (t, i) {
+      var row = Math.floor(i / 3), inRow = Math.min(3, c.traits.length - row * 3), col = i % 3;
+      var rx = W / 2 - (inRow * cwid + (inRow - 1) * gap) / 2 + col * (cwid + gap), ry = y + row * 84;
+      var cg = g.createLinearGradient(0, ry, 0, ry + 68); cg.addColorStop(0, '#f8ecd2'); cg.addColorStop(1, '#ead6ad');
+      g.fillStyle = cg; g.strokeStyle = '#a47c46'; g.lineWidth = 2.5; round(g, rx, ry, cwid, 68, 6); g.fill(); g.stroke();
+      g.fillStyle = '#2a1a10'; var t2 = t; while (g.measureText(t2).width > cwid - 20 && t2.length > 2) t2 = t2.slice(0, -1);
+      g.fillText(t2, rx + cwid / 2, ry + 45);
+    });
+    y += hChips;
+    // 두루마리 상자
+    function box(h, fn) {
+      g.fillStyle = '#fbf3df'; g.strokeStyle = '#cdb68a'; g.lineWidth = 3; round(g, P, y, IW, h, 22); g.fill(); g.stroke();
+      g.fillStyle = '#8b5a2b'; g.fillRect(P + 24, y - 8, IW - 48, 12); g.fillRect(P + 24, y + h - 4, IW - 48, 12);
+      g.textAlign = 'left'; fn(P + 40, y); g.textAlign = 'center'; y += h + 40;
+    }
+    function lines(arr, x, yy) { font(600, 34); g.fillStyle = '#2a1a10'; arr.forEach(function (l) { g.fillText(l, x, yy); yy += LH; }); return yy; }
+    function head(t, x, yy, col) { font(900, 40); g.fillStyle = col || '#8f1d14'; g.fillText(t, x, yy); }
+    box(hDesc, function (x, top) { head('직장에서는 이런 사람', x, top + 76); lines(descL, x, top + 140); });
+    box(hAdv, function (x, top) {
+      head(adv.h1, x, top + 76); var yy = lines(p1L, x, top + 140);
+      head(adv.h2, x, yy + 40, '#1f6f5c'); lines(p2L, x, yy + 104);
+    });
+    if (parts.length) box(hPart, function (x, top) {
+      head(label ? label + '과 잘 맞는 장수' : '같이 일하면 좋은 장수', x, top + 76);
+      var yy = top + 120;
+      parts.forEach(function (p, i) {
+        var rowH = Math.max(130, 70 + whyL[i].length * 38), im = pimgs[i];
+        g.fillStyle = '#efe3c8'; round(g, x, yy, 120, 120, 60); g.fill();
+        if (im) { g.save(); round(g, x, yy, 120, 120, 60); g.clip(); var s2 = 130 / im.width; g.drawImage(im, x + 60 - im.width * s2 / 2, yy - 4, im.width * s2, im.height * s2); g.restore(); }
+        var pc = byName(p.n);
+        font(900, 36); g.fillStyle = '#2a1a10'; g.fillText(p.n, x + 150, yy + 42);
+        var nw = g.measureText(p.n).width; font(600, 26); g.fillStyle = '#6b5238'; g.fillText(pc ? pc.sub : '', x + 166 + nw, yy + 42);
+        font(600, 26); g.fillStyle = '#2a1a10'; whyL[i].forEach(function (l, k) { g.fillText(l, x + 150, yy + 86 + k * 38); });
+        yy += rowH;
+      });
+    });
+    // 맨 아래 주소
+    font(700, 34); g.fillStyle = '#6b5238'; g.fillText('나도 테스트하기', W / 2, H - 120);
+    font(900, 40); g.fillStyle = '#8f1d14'; g.fillText('samguk.overtimenote.kr', W / 2, H - 66);
+    return cv;
+  }
+  // 띄어쓰기 단위로 줄 나누기 (한 단어가 너무 길면 글자 단위)
   function wrap(g, t, max) {
     var out = [], line = '';
-    t.split('').forEach(function (ch) { if (g.measureText(line + ch).width > max) { out.push(line); line = ch; } else line += ch; });
-    out.push(line); return out;
+    String(t).split(' ').forEach(function (w) {
+      var test = line ? line + ' ' + w : w;
+      if (g.measureText(test).width <= max) { line = test; return; }
+      if (line) out.push(line);
+      line = '';
+      w.split('').forEach(function (ch) { if (g.measureText(line + ch).width > max) { out.push(line); line = ch; } else line += ch; });
+    });
+    if (line) out.push(line); return out;
   }
   function round(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 

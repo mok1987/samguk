@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 64" width="120" height="64">
   <!-- 상서로운 구름(祥雲) 무늬 -->
   <g fill="none" stroke="#e2bb5c" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M14 52 H104"/>

@@ -6,7 +6,7 @@
   var YAGEUN_URL = 'https://overtimenote.kr';
   // 카카오톡 공유 (카카오 개발자 사이트의 JavaScript 키, 사이트에 공개되는 키)
   // 방문·이용 통계 (구글 애널리틱스). 측정 ID(G-로 시작)를 넣으면 켜짐. 비워 두면 아무것도 안 보냄
-  var GA_ID = '';
+  var GA_ID = 'G-W2DW1ZYS0R';
   (function () {
     window.dataLayer = window.dataLayer || [];
     window.gtag = function () { dataLayer.push(arguments); };

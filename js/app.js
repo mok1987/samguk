@@ -14,11 +14,10 @@
   };
   function yageunLink() {
     var ua = navigator.userAgent, isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    var isAnd = /Android/i.test(ua);
-    if (isAnd && YAGEUN_STORE.android) return { url: YAGEUN_STORE.android, tag: '플레이 스토어에서 받기' };
-    if (isIOS && YAGEUN_STORE.ios) return { url: YAGEUN_STORE.ios, tag: '앱스토어에서 받기' };
-    if (isIOS && YAGEUN_STORE.android) return { url: YAGEUN_URL, tag: '아이폰 버전 준비 중' };
-    return { url: YAGEUN_URL, tag: '곧 출시' };
+    if (isIOS && YAGEUN_STORE.ios) return { url: YAGEUN_STORE.ios, tag: '앱스토어', cta: "앱스토어에서 '야근수첩' 검색 후 설치" };
+    if (isIOS) return { url: YAGEUN_URL, tag: '아이폰 준비 중', cta: '아이폰 버전 준비 중 · 자세히 보기' };
+    if (YAGEUN_STORE.android) return { url: YAGEUN_STORE.android, tag: '구글 플레이', cta: "구글 플레이에서 '야근수첩' 검색 후 설치" };
+    return { url: YAGEUN_URL, tag: '곧 출시', cta: "구글 플레이 '야근수첩' 곧 출시" };
   }
 
   // 캐릭터별 결과 화면 동작 (이미지 1장을 통째로 움직임)
@@ -293,10 +292,12 @@
   // 야근수첩 배너 (결과 화면 위·아래 두 곳)
   function yageunHTML(c, isPeer) {
     var L = yageunLink();
-    return '<a class="yageun" href="' + L.url + '" target="_blank" rel="noopener"><img class="yicon" src="img/ui/yageun-icon.webp" alt="야근수첩"><span><em class="ytag">' + L.tag + '</em><b>' +
-      (isPeer ? esc(c.name) + '형과 일하다 늘어난 야근, 야근수첩' : esc(c.name) + '형 직장인의 야근 관리, 야근수첩') +
-      '</b><p>' + esc(isPeer ? '누구 때문에 늦게 퇴근했는지, 오늘 야근부터 잠금화면 버튼 한 번으로 남겨 두세요.' : (YAGEUN[c.type] || '')) + '</p></span></a>';
+    return '<a class="yageun" href="' + L.url + '" target="_blank" rel="noopener"><img class="yicon" src="img/ui/yageun-icon.webp" alt="야근수첩"><span>' +
+      '<b>' + (isPeer ? esc(c.name) + '형과 일하다 늘어난 야근,<br>야근수첩에서 기록해 보세요' : '직장인의 야근 기록,<br>야근수첩에서 기록해 보세요') + '</b>' +
+      '<p>잠금화면 버튼 한 번으로 퇴근·야근 시간이 남아요.</p></span>' +
+      '<em class="ycta">' + esc(L.cta) + ' ›</em></a>';
   }
+
 
   // 조심할 점 + 개선 팁 (동료 모드면 '○○님과 일할 때' 문구)
   function adviceHTML(c, who) {

@@ -165,7 +165,7 @@
 
   // ---------- 질문 ----------
   // ---------- 준비: 누구를 / 연차 / 직책 ----------
-  function steps() { return peer() ? 4 : 3; }
+  function steps() { return peer() ? 3 : 2; }
   function stepScreen(step, title, sub, options, picked, onPick, onBack) {
     var opts = options.map(function (o, k) {
       return '<button class="opt setup' + (picked === k ? ' on' : '') + '" data-k="' + k + '">' +
@@ -189,7 +189,7 @@
       { label: '나', desc: '내가 직접 답해요', img: '강유' },
       { label: '동료 · 상사', desc: '그 분을 떠올리며 대신 답해요', img: '조조' }
     ], state.who === 'me' && state.tenure !== null ? 0 : (state.who === 'peer' ? 1 : null),
-    function (k) { state.who = k === 1 ? 'peer' : 'me'; if (peer()) askName(); else chooseTenure(); }, intro);
+    function (k) { state.who = k === 1 ? 'peer' : 'me'; if (peer()) askName(); else chooseProfile(); }, intro);
   }
   // 동료·상사: 이름과 직함 입력 (둘 다 빈칸이어도 됨 → '그 분')
   function askName() {
@@ -203,16 +203,35 @@
       '<button class="btn btn-wood" id="next">다음</button>');
     document.getElementById('back').onclick = chooseWho;
     document.getElementById('next').onclick = function () {
-      state.pname = document.getElementById('pname').value; state.ptitle = document.getElementById('ptitle').value; chooseTenure();
+      state.pname = document.getElementById('pname').value; state.ptitle = document.getElementById('ptitle').value; chooseProfile();
     };
   }
-  function chooseTenure() {
-    stepScreen(peer() ? 3 : 2, peer() ? peerLabel(state) + '은 회사 생활 몇 년 차인가요?' : '회사 생활 몇 년 차인가요?', '', D.tenures.map(function (t) { return { label: t }; }),
-      state.tenure, function (k) { state.tenure = k; chooseRole(); }, peer() ? askName : chooseWho);
-  }
-  function chooseRole() {
-    stepScreen(peer() ? 4 : 3, peer() ? peerLabel(state) + '의 직책은 무엇인가요?' : '지금 직책은 무엇인가요?', '', [{ label: '팀원' }, { label: '팀장' }],
-      state.role, function (k) { state.role = k; state.q = 0; question(); }, chooseTenure);
+  // 연차와 직책을 한 화면에서 고름. 둘 다 고르면 자동으로 1번 문항으로 넘어감
+  function chooseProfile() {
+    var who = peer() ? peerLabel(state) : '';
+    function grp(name, title, labels, picked, cls) {
+      return '<p class="pick-h">' + esc(title) + '</p><div class="pick-grid ' + cls + '">' + labels.map(function (t, k) {
+        return '<button class="opt pick' + (picked === k ? ' on' : '') + '" data-g="' + name + '" data-k="' + k + '"><b>' + esc(t) + '</b></button>';
+      }).join('') + '</div>';
+    }
+    render(
+      '<div class="quiz-top"><button class="back" id="back" aria-label="이전">←</button>' +
+      '<div class="bar"><i style="width:0%"></i></div><span class="count">준비 ' + steps() + '/' + steps() + '</span></div>' +
+      '<div class="scroll qscroll setup-title"><h2 class="qtext">' + (peer() ? esc(who) + '에 대해 알려 주세요' : '나에 대해 알려 주세요') + '</h2>' +
+      '<p class="setup-sub">두 가지를 고르면 바로 시작해요</p></div>' +
+      grp('tenure', peer() ? '회사 생활은 몇 년 차인가요?' : '회사 생활은 몇 년 차인가요?', D.tenures, state.tenure, 'g2') +
+      grp('role', '지금 직책은?', ['팀원', '팀장'], state.role, 'g2'));
+    document.getElementById('back').onclick = peer() ? askName : chooseWho;
+    var timer = null;
+    Array.prototype.forEach.call(app.querySelectorAll('.opt.pick'), function (btn) {
+      btn.onclick = function () {
+        var g = btn.dataset.g, k = +btn.dataset.k;
+        state[g] = k;
+        Array.prototype.forEach.call(app.querySelectorAll('.opt.pick[data-g="' + g + '"]'), function (x) { x.classList.toggle('on', x === btn); });
+        clearTimeout(timer);
+        if (state.tenure != null && state.role != null) timer = setTimeout(function () { state.q = 0; question(); }, 350);
+      };
+    });
   }
 
   function question() {
@@ -225,7 +244,7 @@
       '<div class="quiz-top"><button class="back" id="back" aria-label="이전">←</button>' +
       '<div class="bar"><i style="width:' + ((i) / 16 * 100) + '%"></i></div><span class="count">' + (i + 1) + ' / 16</span></div>' +
       '<div class="scroll qscroll"><div class="qnum">제' + (i + 1) + '문</div><h2 class="qtext">' + esc(Q.q) + '</h2></div>' + opts);
-    document.getElementById('back').onclick = function () { if (state.q === 0) chooseRole(); else { state.q--; question(); } };
+    document.getElementById('back').onclick = function () { if (state.q === 0) chooseProfile(); else { state.q--; question(); } };
     Array.prototype.forEach.call(app.querySelectorAll('.opt'), function (b) {
       b.onclick = function () {
         var k = +b.dataset.k; state.answers[i] = k;

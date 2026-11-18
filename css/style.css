@@ -306,3 +306,9 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .yageun b{display:block;font-size:14px;line-height:1.35;word-break:keep-all}
 .yageun .ycta{display:block;font-style:normal;font-size:12px;font-weight:700;color:var(--gold);margin-top:2px}
 .partner-note{text-align:center;font-family:var(--serif);font-weight:700;font-size:14.5px;color:var(--seal);margin-top:10px}
+
+/* 연차·직책 한 화면 */
+.pick-h{font-family:var(--serif);font-weight:800;font-size:16px;color:var(--ink2);margin:14px 4px 8px}
+.pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt.pick{justify-content:center;text-align:center;padding:14px 8px;margin:0}
+.opt.pick b{font-size:18px}

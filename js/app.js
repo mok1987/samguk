@@ -221,7 +221,7 @@
       '<p class="setup-sub">두 가지를 고르면 바로 시작해요</p></div>' +
       grp('tenure', peer() ? '회사 생활은 몇 년 차인가요?' : '회사 생활은 몇 년 차인가요?', D.tenures, state.tenure, 'g2') +
       grp('role', '지금 직책은?', ['팀원', '팀장'], state.role, 'g2'));
-    document.getElementById('back').onclick = peer() ? askName : chooseWho;
+    document.getElementById('back').onclick = state.vs ? function () { vsIntro(state.vs.char, state.vs.n); } : (peer() ? askName : chooseWho);
     var timer = null;
     Array.prototype.forEach.call(app.querySelectorAll('.opt.pick'), function (btn) {
       btn.onclick = function () {
@@ -260,8 +260,9 @@
     render('<div class="loading"><div><div class="spin"></div><p>군사가 천하의 형세를 살피는 중…</p></div></div>');
     var top = E.judge(state.answers, D, { tenure: state.tenure, role: state.role });
     saveAnswers(state.answers, top[0].char.name);
+    if (state.vs) track('vs_complete', { result: top[0].char.name, partner: state.vs.char.name });
     track('test_complete', { result: top[0].char.name, who: state.who === 'peer' ? '동료' : '나', tenure: D.tenures[state.tenure], role: state.role === 1 ? '팀장' : '팀원' });
-    var ctx = { who: state.who, tenure: state.tenure, role: state.role, label: peerLabel(state), title: (state.ptitle || '').trim() };
+    var ctx = { who: state.who, tenure: state.tenure, role: state.role, label: peerLabel(state), title: (state.ptitle || '').trim(), vs: state.vs || null };
     loopTimer = setTimeout(function () { result(top, false, ctx); }, 1400);
   }
 
@@ -277,10 +278,131 @@
 
   // ---------- 결과 ----------
   var lastResult = null;
+  // ===================== 동료 궁합 =====================
+  // 계산은 '같이 일하면 좋은 장수'와 같은 기준(tools/engine.py _pair_score)을 양쪽으로 평균
+  var PAIR_COMP = [2, 4, 12, 15];
+  var STYLE = {  // 일하는 방식 이름 (문항 인덱스: 답 A/B/C)
+    4: ['바로 실행파', '충분한 논의파', '꼼꼼한 검토파'],
+    12: ['위험 대비파', '검토 후 결정파', '일단 결단파'],
+    2: ['철저한 대비파', '핵심 위험 체크파', '실행 우선파'],
+    15: ['끝까지 재도전파', '원인 분석파', '방향 전환파']
+  };
+  function prof(c) { return c.profile.split('').map(function (ch) { return ch.charCodeAt(0) - 65; }); }
+  function pairQuality(y) { return [1, 0, -1][y[3]] + [-0.8, 0, 0.6][y[11]] + [0.6, 0.2, -0.6][y[13]]; }
+  function pairOne(x, y) {
+    var s = 0; PAIR_COMP.forEach(function (q) { if (x[q] !== y[q]) s += 1; });
+    s += pairQuality(y);
+    if (x[3] === 0 && y[3] === 0) s += 0.5;
+    if (x[0] === 0 && y[0] === 0) s -= 1;
+    if (x[13] === 2 && y[13] === 2) s -= 1;
+    return s;
+  }
+  function pairScore(a, b) { var x = prof(a), y = prof(b); return (pairOne(x, y) + pairOne(y, x)) / 2; }
+  var pairAll = null;
+  function pairPct(a, b) {  // 30명끼리 435쌍 중 몇 % 위치인지 (0~1)
+    if (!pairAll) { pairAll = []; D.chars.forEach(function (p, i) { D.chars.forEach(function (q, j) { if (i < j) pairAll.push(pairScore(p, q)); }); }); pairAll.sort(function (m, n) { return m - n; }); }
+    var s = pairScore(a, b), lo = 0, eq = 0;
+    pairAll.forEach(function (v) { if (v < s) lo++; else if (v === s) eq++; });
+    return (lo + eq / 2) / pairAll.length;
+  }
+  function jo(word, a, b) { var code = word.charCodeAt(word.length - 1) - 0xAC00; return (code >= 0 && code < 11172 && code % 28) ? a : b; }
+  function compat(a, b, na, nb) {  // a·b: 장수, na·nb: 부를 이름
+    var x = prof(a), y = prof(b), lines = [];
+    if (a.name === b.name) {
+      return { score: 90, grade: '거울 같은 사이', lines: ['둘 다 ' + a.name + '! 생각하는 방식이 똑같아서 말하지 않아도 통해요.', '다만 약점도 같아서, 둘 다 놓치는 부분이 생기기 쉬워요.'],
+        tip: '서로의 판단을 한 번씩 의심해 보고, 다른 유형의 동료에게 검토를 부탁해 보세요.' };
+    }
+    var p = pairPct(a, b), score = Math.round(60 + p * 39);
+    var grade = p >= 0.85 ? '천생연분' : p >= 0.5 ? '든든한 짝' : p >= 0.15 ? '서로 배울 점 많은 사이' : '부딪히기 쉬운 사이';
+    var diff = PAIR_COMP.filter(function (q) { return x[q] !== y[q]; })
+      .sort(function (m, n) { return Math.abs(y[n] - x[n]) - Math.abs(y[m] - x[m]); });
+    if (diff.length) {
+      var q = diff[0];
+      lines.push(na + jo(na, '은', '는') + ' ' + STYLE[q][x[q]] + ', ' + nb + jo(nb, '은', '는') + ' ' + STYLE[q][y[q]] + '라 서로 빈 곳을 채워 줘요.');
+    } else lines.push('일하는 방식이 비슷해서 손발이 척척 맞아요.');
+    if (x[0] === 0 && y[0] === 0) lines.push('둘 다 높은 자리를 노려서 주도권 다툼이 생길 수 있어요.');
+    else if (x[13] === 2 && y[13] === 2) lines.push('둘 다 자기 주장이 강해서 한번 부딪히면 오래가요.');
+    else if (x[3] === 2 || y[3] === 2) { var w = x[3] === 2 ? na : nb, o = x[3] === 2 ? nb : na; lines.push(w + jo(w, '이', '가') + ' 힘든 일을 넘기면 ' + o + jo(o, '이', '가') + ' 부담을 떠안기 쉬워요.'); }
+    else if (x[3] === 0 && y[3] === 0) lines.push('둘 다 맡은 일은 끝까지 책임져서 믿고 맡길 수 있어요.');
+    else if (x[11] === 2 && y[11] === 2) lines.push('둘 다 의리를 중시해서 한번 한 팀이면 오래가요.');
+    else if (x[9] !== y[9] && (x[9] === 0 || y[9] === 0)) { var z = x[9] === 0 ? na : nb; lines.push(z + jo(z, '이', '가') + ' 윗선에 할 말을 대신 해 주는 든든한 방패가 돼요.'); }
+    else lines.push(na + '의 강점은 ' + a.traits[0] + ', ' + nb + '의 강점은 ' + b.traits[0] + '이에요.');
+    var tip = { '천생연분': '큰 프로젝트일수록 둘을 한 팀으로 묶어 보세요.', '든든한 짝': '역할만 먼저 나눠 두면 시너지가 커요.',
+      '서로 배울 점 많은 사이': '생각이 다를 때 바로 반박하기보다 이유를 먼저 물어보세요.', '부딪히기 쉬운 사이': '결정 기준과 마감을 먼저 정해 두면 부딪힐 일이 확 줄어요.' }[grade];
+    return { score: score, grade: grade, lines: lines, tip: tip };
+  }
+  function nick(n) { n = (n || '').trim().slice(0, 12); return n ? n + '님' : '동료'; }
+  function compatHTML(a, b, na, nb) {  // a=왼쪽, b=오른쪽
+    var r = compat(a, b, na, nb);
+    return '<div class="scroll compat"><h3>' + esc(na) + ' × ' + esc(nb) + ' 궁합</h3>' +
+      '<div class="cp-pair"><div><img src="' + img(a.name) + '" alt=""><b>' + esc(a.name) + '</b><span>' + esc(na) + '</span></div>' +
+      '<div class="cp-score"><strong>' + r.score + '<small>점</small></strong><em>' + esc(r.grade) + '</em></div>' +
+      '<div><img src="' + img(b.name) + '" alt=""><b>' + esc(b.name) + '</b><span>' + esc(nb) + '</span></div></div>' +
+      r.lines.map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') +
+      '<p class="cp-tip"><b>같이 일할 때</b> ' + esc(r.tip) + '</p></div>';
+  }
+  // 궁합 링크 보내기. mode 'invite': 내 장수로 초대 / 'result': 궁합 결과 돌려보내기(other=상대 장수, otherNick=상대 이름)
+  function vsShare(c, mode, other, otherNick) {
+    var bg = sheet('<h3>' + (mode === 'invite' ? '동료에게 궁합 초대 보내기' : '궁합 결과 보내기') + '</h3>' +
+      '<p>' + (mode === 'invite' ? '동료가 테스트를 마치면 둘의 궁합이 나와요.' : '동료에게도 우리 궁합을 보여 줘요.') + '</p>' +
+      '<label class="field"><span>내 이름이나 별명</span><input id="vsnick" maxlength="12" placeholder="안 써도 돼요. 비우면 \'동료\'로 나와요"></label>' +
+      palaceBtn('vsKakao', '傳 令', '카카오톡으로 보내기') + '<button class="link-share" id="vsOther">링크 복사 · 다른 앱으로 보내기</button>');
+    var inp = bg.querySelector('#vsnick');
+    try { inp.value = localStorage.getItem('samguk_nick') || ''; } catch (e) {}
+    function go(other2) {
+      var n = inp.value.trim().slice(0, 12); try { localStorage.setItem('samguk_nick', n); } catch (e) {}
+      var base = SITE.replace(/index\.html$/, ''), me = nick(n);
+      var qs = 'n=' + encodeURIComponent(n) + (mode === 'result' ? '&b=' + encodeURIComponent(other.name) + '&m=' + encodeURIComponent(otherNick || '') : '');
+      var url = base + 'r/' + SLUG[c.name] + '-vs.html?' + qs;
+      var r = mode === 'result' ? compat(c, other, me, nick(otherNick)) : null;
+      var title = mode === 'invite' ? (n ? n + '님' : '동료') + jo(n ? '님' : '동료', '은', '는') + ' 회사에서 ' + c.name + '래요. 우리 궁합은?'
+        : c.name + ' × ' + other.name + ' 궁합 ' + r.score + '점, ' + r.grade;
+      var desc = mode === 'invite' ? '테스트하면 둘의 궁합이 나와요 · 직장 삼국지' : r.lines[0];
+      track(mode === 'invite' ? 'vs_invite' : 'vs_result_share', { method: other2 ? '링크·기타' : '카카오톡', result: c.name });
+      bg.remove();
+      if (!other2) try {
+        if (window.Kakao && Kakao.isInitialized() && Kakao.Share) {
+          Kakao.Share.sendDefault({ objectType: 'feed',
+            content: { title: title, description: desc, imageUrl: base + 'img/share/' + SLUG[c.name] + '-vs.jpg', imageWidth: 1200, imageHeight: 630, link: { mobileWebUrl: url, webUrl: url } },
+            buttons: mode === 'invite' ? [{ title: '궁합 보러 가기', link: { mobileWebUrl: url, webUrl: url } }]
+              : [{ title: '궁합 보기', link: { mobileWebUrl: url, webUrl: url } }, { title: '나도 테스트하기', link: { mobileWebUrl: base, webUrl: base } }] });
+          return;
+        }
+      } catch (e) {}
+      otherShare(title, url);
+    }
+    bg.querySelector('#vsKakao').onclick = function () { go(false); };
+    bg.querySelector('#vsOther').onclick = function () { go(true); };
+  }
+  // 초대 링크로 들어온 첫 화면
+  function vsIntro(a, n) {
+    var who = nick(n);
+    render('<section class="result vs-intro">' +
+      '<div class="hyeonpan"><i></i><h1>직장 삼국지</h1><small>職場三國志</small></div>' +
+      '<div class="scroll center lead"><b>' + esc(who) + '</b>' + jo(who, '이', '가') + ' 궁합을 보자고 했어요!<br>' + esc(who) + jo(who, '은', '는') + ' 회사에서 <b>' + esc(a.name) + '</b>래요.</div>' +
+      '<div class="vs-hero"><img src="' + img(a.name) + '" alt=""><span class="vs-q">?</span></div>' +
+      plate(a) +
+      '<p class="meta">나도 테스트하면 둘의 궁합이 바로 나와요</p>' +
+      '<div class="actions">' + palaceBtn('vsStart', '出 征', '궁합 보러 가기') + '</div>' +
+      '</section>');
+    document.getElementById('vsStart').onclick = function () { track('test_start', { from: 'vs' }); state = newState(); state.vs = { char: a, n: n }; chooseProfile(); };
+  }
+  // 궁합 결과 링크로 들어온 화면 (a=보낸 사람, b=받는 사람)
+  function vsPairView(a, na, b, nb) {
+    render('<section class="result">' +
+      '<div class="hyeonpan"><i></i><h1>직장 삼국지</h1><small>職場三國志</small></div>' +
+      compatHTML(a, b, nick(na), nick(nb)) +
+      '<div class="actions">' + palaceBtn('vsMine', '出 征', '나도 궁합 보기') +
+      '<button class="btn btn-wood" id="vsHome">처음으로</button></div>' +
+      '<p class="footer">재미로 보는 테스트예요. 결과는 실제 성격 검사가 아닙니다.</p></section>');
+    document.getElementById('vsMine').onclick = function () { track('test_start', { from: 'vs_pair' }); history.replaceState(null, '', location.pathname); state = newState(); chooseWho(); };
+    document.getElementById('vsHome').onclick = function () { history.replaceState(null, '', location.pathname); intro(); };
+  }
+
   function result(top, shared, ctx) {
     ctx = ctx || {};
     lastResult = { top: top, shared: shared, ctx: ctx };
-    var me = top[0], c = me.char, isPeer = ctx.who === 'peer';
+    var me = top[0], c = me.char, isPeer = ctx.who === 'peer', vs = (!shared && !isPeer && ctx.vs) || null;
     var who = isPeer ? (shared ? '그 분' : (ctx.label || '그 분')) : '';
     markSeen(c.name);
     var sim = top.slice(1).map(function (t) {
@@ -295,11 +417,13 @@
       '<p class="tap-hint">캐릭터를 누르면 다시 말해요</p>' +
       plate(c) +
       '<div class="chips">' + c.traits.map(function (t) { return '<span class="chip">' + esc(t) + '</span>'; }).join('') + '</div>' +
+      (vs ? compatHTML(c, vs.char, '나', nick(vs.n)) + palaceBtn('vsBack', '傳 令', '궁합 결과 보내기') : '') +
       yageunHTML(c, isPeer) +
       '<div class="scroll"><h3>직장에서는 이런 사람</h3><p>' + esc(c.desc) + '</p></div>' +
       adviceHTML(c, isPeer ? who : null) + partnersHTML(c, isPeer ? who : null) +
       '<div class="actions">' +
       (shared ? palaceBtn('again', '出 征', '나도 해 보기') :
+        (!isPeer ? palaceBtn('vsInvite', '合 心', '동료와 궁합 보기') : '') +
         palaceBtn('share', '傳 令', '카카오톡으로 공유') +
         '<button class="link-share" id="share2">링크 복사 · 다른 앱으로 공유</button>' +
         '<div class="row"><button class="btn btn-wood" id="save">이미지 저장</button><button class="btn btn-wood" id="again">' + (isPeer ? '다른 사람 보기' : '다시 하기') + '</button></div>') +
@@ -316,6 +440,8 @@
     document.getElementById('dex').onclick = dex;
     var sh = document.getElementById('share'); if (sh) sh.onclick = function () { share(c, isPeer, ctx.title); };
     var sh2 = document.getElementById('share2'); if (sh2) sh2.onclick = function () { share(c, isPeer, ctx.title, true); };
+    var vi = document.getElementById('vsInvite'); if (vi) vi.onclick = function () { vsShare(c, 'invite'); };
+    var vb = document.getElementById('vsBack'); if (vb) vb.onclick = function () { vsShare(c, 'result', vs.char, vs.n); };
     var sv = document.getElementById('save'); if (sv) { sv.onclick = function () { saveImage(c, isPeer, ctx); }; setTimeout(function () { buildImage(c, isPeer, ctx).catch(function () {}); }, 1500); }
   }
 
@@ -661,7 +787,11 @@
   }
 
   // ---------- 시작점 ----------
-  var r = new URLSearchParams(location.search).get('r');
+  var QS = new URLSearchParams(location.search);
+  var vsA = QS.get('vs') && byName(QS.get('vs')), vsB = QS.get('b') && byName(QS.get('b'));
+  if (vsA && vsB) { track('vs_pair_visit', { result: vsA.name }); vsPairView(vsA, QS.get('n'), vsB, QS.get('m')); return; }
+  if (vsA) { track('vs_visit', { result: vsA.name }); vsIntro(vsA, QS.get('n')); return; }
+  var r = QS.get('r');
   var shared = r && byName(r);
   if (shared) track('shared_visit', { result: shared.name });
   if (shared) result([{ char: shared, match: 0 }], true, { who: new URLSearchParams(location.search).get('p') ? 'peer' : 'me' }); else intro();

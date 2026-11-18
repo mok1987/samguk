@@ -72,6 +72,18 @@ def card(c, team=False):
     for i, l in enumerate(lines): d.text((x0 + 18, 452 + i * 46), l, font=f_q, fill=INK)
     return im.convert('RGB')
 
+def card_vs(c):  # 동료 궁합 초대 카드
+    im = card(c)  # 기본 카드 위에 오른쪽 아래(부제·말풍선 자리)를 덮어씀
+    d = ImageDraw.Draw(im)
+    d.rectangle([600, 340, 1200, 630], fill=PAPER)
+    d.rectangle([600, 60, 1200, 120], fill=PAPER)
+    d.text((610, 70), '직장 삼국지 · 동료 궁합', font=ImageFont.truetype(FONT_B, 30), fill=SEAL)
+    f_big = ImageFont.truetype(FONT_B, 64); f_s = ImageFont.truetype(FONT, 32)
+    d.text((610, 370), '우리 궁합은?', font=f_big, fill=INK)
+    d.text((612, 470), '나도 테스트하면', font=f_s, fill=(107, 82, 56))
+    d.text((612, 516), '둘의 궁합이 바로 나와요', font=f_s, fill=(107, 82, 56))
+    return im
+
 PAGE = '''<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -84,7 +96,7 @@ PAGE = '''<!doctype html>
 <meta property="og:url" content="{url}">
 <meta name="twitter:card" content="summary_large_image">
 <meta http-equiv="refresh" content="0; url={app}">
-<script>location.replace({app_js});</script>
+<script>location.replace({app_js} + (location.search ? '&' + location.search.slice(1) : ''));</script>
 </head><body><a href="{app}">직장 삼국지로 이동</a></body></html>
 '''
 
@@ -103,10 +115,18 @@ if __name__ == '__main__':
             open(os.path.join(ROOT, 'r', name), 'w', encoding='utf-8').write(PAGE.format(
                 title=html.escape(title), desc=html.escape(desc), image=image, url=SITE + 'r/' + name,
                 app=html.escape(app), app_js=json.dumps(app, ensure_ascii=False)))
+        # 동료 궁합 초대 (r/jojo-vs.html?n=별명 → ../?vs=조조&n=별명)
+        fn = slug + '-vs.jpg'
+        card_vs(c).save(os.path.join(ROOT, 'img', 'share', fn), 'JPEG', quality=86, optimize=True)
+        app = '../?vs=' + c['name']
+        name = slug + '-vs.html'
+        open(os.path.join(ROOT, 'r', name), 'w', encoding='utf-8').write(PAGE.format(
+            title=html.escape(f"동료는 회사에서 {c['name']}래요. 우리 궁합은?"), desc=html.escape('나도 테스트하면 둘의 궁합이 나와요 · 직장 삼국지'),
+            image=SITE + 'img/share/' + fn, url=SITE + 'r/' + name, app=html.escape(app), app_js=json.dumps(app, ensure_ascii=False)))
     idx = os.path.join(ROOT, 'index.html'); h = open(idx, encoding='utf-8').read()
     import re
     h = re.sub(r'<meta property="og:image" content="[^"]*">', f'<meta property="og:image" content="{SITE}img/og.png">', h)
     if 'og:url' not in h: h = h.replace('<meta property="og:image"', f'<meta property="og:url" content="{SITE}">\n<meta property="og:image"', 1)
     else: h = re.sub(r'<meta property="og:url" content="[^"]*">', f'<meta property="og:url" content="{SITE}">', h)
     open(idx, 'w', encoding='utf-8').write(h)
-    print('카드 60장, 공유 페이지 60개 생성 →', SITE)
+    print('카드 90장, 공유 페이지 90개 생성 →', SITE)
